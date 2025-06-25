@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Information</title>
-    <!-- Tailwind CSS for styling -->
+    <title>Live Product Data from Google Sheet</title>
+    <!-- Tailwind CSS for modern styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for better typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,172 +14,187 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        /* Simple animation for loading spinner */
+        .loader {
+            border-top-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-gray-100 text-gray-800 antialiased">
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Product Dashboard</h1>
-            <p class="text-gray-600 mt-1">Fetching live product data from a Google Sheet using JSONP.</p>
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
+        
+        <!-- Header Section -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-gray-900">Live Product Inventory</h1>
+            <p class="text-gray-600 mt-2 text-lg">Data sourced directly from a Google Sheet published as a CSV.</p>
         </header>
 
-        <!-- Control Panel -->
-        <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Product Data</h2>
-            <button id="refreshButton" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors duration-300">
-                Refresh Data
-            </button>
-        </div>
-
-        <!-- Error and Message Display -->
-        <div id="message-area" class="hidden my-4 p-4 rounded-lg"></div>
-
-        <!-- Product Container -->
-        <div id="product-container" class="space-y-4">
-            <!-- Loading State -->
-            <div id="loading-state" class="text-center py-10">
-                <p class="text-gray-500">Loading data...</p>
+        <!-- Main Content Area -->
+        <main class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+            
+            <!-- Controls and Status -->
+            <div class="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <h2 class="text-2xl font-semibold text-gray-700">Available Products</h2>
+                <button id="refreshButton" class="w-full sm:w-auto bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" id="refresh-icon" class="bi bi-arrow-clockwise" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/></svg>
+                    <span>Refresh Data</span>
+                </button>
             </div>
-        </div>
+
+            <!-- Message Area for Errors or Info -->
+            <div id="message-area" class="hidden my-4 p-4 rounded-lg text-center"></div>
+
+            <!-- Product Display Area -->
+            <div id="product-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Loading State will be shown here initially -->
+            </div>
+            
+            <!-- Initial Loading Placeholder -->
+            <div id="loading-state" class="text-center py-16">
+                 <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto mb-4"></div>
+                <p class="text-lg text-gray-500">Fetching live data...</p>
+            </div>
+
+        </main>
     </div>
 
     <script>
-        // IMPORTANT: Replace this with the NEW URL from your deployed Google Apps Script.
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby_c4mIBoyWJAeH5MxAkHHurvwtTzg9EXWi2mqPIliKG7DHZQNK2mi7m4Z5YnztCMkcPg/exec';
+        // --- STEP 1: Paste your public CSV URL here ---
+        // Go to your sheet -> File -> Share -> Publish to web -> Select Sheet & CSV -> Publish -> Copy URL
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTaK-R7AVpsh6Uq85xGNh-Lv9Ri22RbsP9KQxSWgCQFPGabd_fsCiZCuXvJuuDrZF9YtbwvwKjeHlo6/pub?gid=0&single=true&output=csv';
 
         const productContainer = document.getElementById('product-container');
         const refreshButton = document.getElementById('refreshButton');
         const messageArea = document.getElementById('message-area');
         const loadingState = document.getElementById('loading-state');
+        const refreshIcon = document.getElementById('refresh-icon');
 
         /**
-         * Displays a message, error, or notification to the user.
+         * Displays a prominent message to the user (e.g., for errors or success).
          * @param {string} text - The message to display.
-         * @param {'error' | 'success' | 'info'} type - The type of message.
+         * @param {'error' | 'success' | 'info'} type - The style of the message box.
          */
         function showMessage(text, type = 'info') {
             messageArea.textContent = text;
-            messageArea.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            messageArea.className = 'my-4 p-4 rounded-lg text-center font-semibold'; // Reset classes
             if (type === 'error') {
-                messageArea.classList.add('bg-red-100', 'text-red-700');
+                messageArea.classList.add('bg-red-100', 'text-red-800');
             } else if (type === 'success') {
-                messageArea.classList.add('bg-green-100', 'text-green-700');
-            } else {
-                messageArea.classList.add('bg-gray-100', 'text-gray-700');
+                messageArea.classList.add('bg-green-100', 'text-green-800');
+            } else { // info
+                messageArea.classList.add('bg-blue-100', 'text-blue-800');
             }
-            messageArea.classList.remove('hidden');
         }
 
         /**
-         * This function is the JSONP callback, executed by the script from Google.
-         * @param {object} response - The data object from the Google Apps Script.
+         * Parses raw CSV text into an array of objects.
+         * This version is more robust and handles potential empty lines.
+         * @param {string} csvText - The raw text from the fetched CSV file.
+         * @returns {Array<Object>} An array of product objects.
          */
-        function handleProductData(response) {
-            loadingState.style.display = 'none'; // Hide loading indicator
-            productContainer.innerHTML = ''; // Clear previous content
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length < 2) return [];
 
-            // Check for an error from the Apps Script itself
-            if (response.error) {
-                showMessage(`Apps Script Error: ${response.error}`, 'error');
-                console.error("Apps Script Error:", response.error);
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const dataRows = lines.slice(1);
+
+            return dataRows.map(row => {
+                const values = row.split(',');
+                const obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = values[index] ? values[index].trim() : '';
+                });
+                return obj;
+            });
+        }
+
+        /**
+         * Fetches and displays the product data.
+         */
+        async function fetchProducts() {
+            if (CSV_URL === 'PASTE_YOUR_GOOGLE_SHEET_CSV_URL_HERE') {
+                showMessage('Configuration Needed: Please paste the CSV URL from your Google Sheet into the script.', 'error');
+                loadingState.style.display = 'none';
                 return;
             }
 
-            // Check for a message (e.g., "No data available")
-            if (response.message) {
-                showMessage(`Message from Script: ${response.message}`, 'info');
-                return;
-            }
-            
-            // Check if the data is not an array or is empty
-            if (!Array.isArray(response) || response.length === 0) {
-                showMessage('No product data was returned. The sheet might be empty.', 'info');
-                return;
-            }
+            productContainer.innerHTML = '';
+            loadingState.style.display = 'block';
+            messageArea.classList.add('hidden');
+            refreshButton.disabled = true;
+            refreshIcon.classList.add('animate-spin');
 
-            // If we have data, display it
-            showMessage(`Successfully loaded ${response.length} items.`, 'success');
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) {
+                    throw new Error(`Network Error: Status ${response.status}. Check if the URL is correct and the sheet is published.`);
+                }
+                const csvText = await response.text();
+                const products = parseCSV(csvText);
+                
+                loadingState.style.display = 'none';
 
-            response.forEach(item => {
+                if (products.length > 0) {
+                    messageArea.classList.add('hidden'); // Hide any previous messages on success
+                    displayProducts(products);
+                } else {
+                    showMessage('No products found. The sheet might be empty or not formatted correctly.', 'info');
+                }
+
+            } catch (error) {
+                loadingState.style.display = 'none';
+                console.error('Fetch Error:', error);
+                showMessage(error.message, 'error');
+            } finally {
+                refreshButton.disabled = false;
+                refreshIcon.classList.remove('animate-spin');
+            }
+        }
+
+        /**
+         * Renders the product data into nice-looking cards.
+         * @param {Array<Object>} products - The array of product objects.
+         */
+        function displayProducts(products) {
+            products.forEach(item => {
                 const card = document.createElement('div');
-                card.className = 'bg-white border border-gray-200 rounded-lg shadow-sm p-5 transform hover:scale-101 transition-transform duration-300';
-
+                card.className = 'bg-white border border-gray-200 rounded-lg shadow-sm p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-1';
+                
                 const ul = document.createElement('ul');
-                ul.className = 'space-y-2';
+ul.className = 'space-y-3';
 
                 Object.entries(item).forEach(([key, value]) => {
                     const li = document.createElement('li');
-                    li.className = 'flex justify-between items-center';
+                    li.className = 'flex justify-between items-center text-sm pb-2 border-b border-gray-100';
                     
                     const keySpan = document.createElement('span');
-                    keySpan.className = 'font-semibold text-gray-700 capitalize';
-                    keySpan.textContent = key.replace(/([A-Z])/g, ' $1'); // Add space before caps for better reading
+                    keySpan.className = 'font-semibold text-gray-600 capitalize';
+                    keySpan.textContent = key;
                     
                     const valueSpan = document.createElement('span');
-                    valueSpan.className = 'text-gray-600 bg-gray-100 px-2 py-1 rounded';
+                    valueSpan.className = 'text-gray-800 bg-gray-100 px-2.5 py-1 rounded-full font-medium';
                     valueSpan.textContent = value;
-
+                    
                     li.appendChild(keySpan);
                     li.appendChild(valueSpan);
                     ul.appendChild(li);
                 });
-
                 card.appendChild(ul);
                 productContainer.appendChild(card);
             });
-            console.log("JSONP data fetched and displayed successfully:", response);
         }
 
-        /**
-         * Fetches product data using the JSONP technique.
-         */
-        function fetchProductsJSONP() {
-            productContainer.innerHTML = ''; // Clear old results
-            loadingState.style.display = 'block'; // Show loading
-            messageArea.classList.add('hidden'); // Hide old messages
-
-            // Generate a unique callback name to avoid conflicts and cache issues
-            const callbackName = 'jsonpCallback_' + Date.now();
-
-            // Create a new script element for the JSONP request
-            const script = document.createElement('script');
-            script.src = `${WEB_APP_URL}?callback=${callbackName}`;
-
-            // Handle script loading errors (e.g., network issue, invalid URL, or permissions error)
-            script.onerror = () => {
-                showMessage('Failed to load the script. Check the Web App URL and deployment permissions (must be "Anyone").', 'error');
-                console.error("JSONP script failed to load. This is often due to incorrect deployment permissions on the Google Apps Script.");
-                loadingState.style.display = 'none';
-                
-                // Clean up the failed script and callback
-                delete window[callbackName];
-                if (script.parentNode) {
-                    script.parentNode.removeChild(script);
-                }
-            };
-
-            // Assign the callback function to the global window object
-            // This makes it accessible to the script returned from Google
-            window[callbackName] = (data) => {
-                handleProductData(data); // Process the received data
-
-                // Clean up after execution
-                delete window[callbackName];
-                if (script.parentNode) {
-                    script.parentNode.removeChild(script);
-                }
-            };
-
-            // Append the script to the document head to trigger the request
-            document.head.appendChild(script);
-        }
-
-        // Add event listener to the refresh button
-        refreshButton.addEventListener('click', fetchProductsJSONP);
-
-        // Fetch data automatically when the page first loads
-        document.addEventListener('DOMContentLoaded', fetchProductsJSONP);
+        // Add event listeners
+        refreshButton.addEventListener('click', fetchProducts);
+        document.addEventListener('DOMContentLoaded', fetchProducts);
     </script>
 </body>
 </html>
