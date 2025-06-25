@@ -1,18 +1,17 @@
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug Product Info</title>
+    <title>JSONP Product Info</title>
 </head>
 <body>
 
-    <h1>Raw Product Information from Google Sheet</h1>
-    <p>This page will dump all key-value pairs received from the Apps Script.</p>
-    <p>If you see "Failed to fetch", check browser console for CORS errors. If empty, check Apps Script logs for "Sheet not found" or "no rows retrieved".</p>
+    <h1>Raw Product Information from Google Sheet (JSONP)</h1>
+    <p>This page uses JSONP to fetch data, bypassing typical CORS restrictions.</p>
     <hr>
 
-    <button id="refreshButton">Refresh Raw Data</button>
+    <button id="refreshButton">Refresh Raw Data (JSONP)</button>
 
     <div id="product-container">
         Loading data...
@@ -21,92 +20,92 @@
     <div id="error-message" style="color: red; margin-top: 10px; border: 1px solid red; padding: 5px;"></div>
 
     <script>
-        // Your deployed Google Apps Script Web App URL
-        // This URL is specific to YOUR Google Apps Script deployment.
-        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw6iKxCi4wXTysVJ-nAwIhp0V0-BZj_aYTJIOF8g9W0JxIRhymK2OEGG2f0SS4MvB4zXw/exec';
+        // Your deployed Google Apps Script Web App URL (for JSONP)
+        // Ensure this is the URL from your Apps Script deployed with the JSONP code.
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw6iKxCi4wXTysVJ-nAwIhp0V0-BZj_aYTJIOF8g9W0JxIRhymK2OEGG2f0SS4MvB4zXw/exec'; // This should be updated if you create a new script
 
         const productContainer = document.getElementById('product-container');
         const refreshButton = document.getElementById('refreshButton');
         const errorMessage = document.getElementById('error-message');
 
-        /**
-         * Fetches product data from the Google Apps Script web app and displays all variables.
-         */
-        async function fetchProducts() {
-            productContainer.textContent = 'Loading data...'; // Simple loading message
-            errorMessage.textContent = ''; // Clear previous errors
+        // This function will be called by the JSONP response
+        function handleProductData(data) {
+            productContainer.textContent = ''; // Clear loading message
 
-            try {
-                const response = await fetch(WEB_APP_URL);
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error("HTTP Response Not OK:", response.status, response.statusText, errorText);
-                    throw new Error(`HTTP Status: ${response.status}`);
-                }
-
-                const data = await response.json();
-
-                // Handle errors or messages directly from Apps Script
-                if (data.error) {
-                    throw new Error(`Apps Script Error: ${data.error}`);
-                }
-                if (data.message) {
-                    productContainer.textContent = `Message from Script: ${data.message}`;
-                    return;
-                }
-
-                if (data.length === 0) {
-                    productContainer.textContent = 'No product data received (empty array).';
-                    return;
-                }
-
-                // Clear previous content
-                productContainer.innerHTML = '';
-
-                // Display each item and all its variables
-                data.forEach((item, index) => {
-                    const div = document.createElement('div');
-                    div.style.marginBottom = '15px';
-                    div.style.border = '1px solid #ccc';
-                    div.style.padding = '10px';
-
-                    const itemTitle = document.createElement('h3');
-                    itemTitle.textContent = `Item ${index + 1}:`;
-                    div.appendChild(itemTitle);
-
-                    const ul = document.createElement('ul');
-                    ul.style.listStyleType = 'none';
-                    ul.style.paddingLeft = '0';
-
-                    // Iterate over all entries (key-value pairs) in the item object
-                    Object.entries(item).forEach(([key, value]) => {
-                        const li = document.createElement('li');
-                        li.textContent = `Key: "${key}" | Value: "${value}" (Type: ${typeof value})`;
-                        ul.appendChild(li);
-                    });
-                    div.appendChild(ul);
-                    productContainer.appendChild(div);
-                });
-
-                console.log("Raw data fetched and displayed successfully:", data);
-
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
-                errorMessage.textContent = `Error: ${error.message}. Please check console for details.
-                                             **Common Issues:**
-                                             - **CORS:** If running from 'file:///' or 'http://localhost', try a CORS browser extension or deploy to GitHub Pages.
-                                             - **Apps Script Error:** If the Apps Script URL itself doesn't return JSON in an incognito tab, check your Apps Script 'Executions' log for detailed errors.
-                                             - **Incorrect Sheet Name:** Ensure the 'SHEET_NAME' in your Apps Script exactly matches your Google Sheet's tab name.
-                                             - **No Data in Sheet:** Ensure your Google Sheet has data *below the header row*.`;
+            if (data.error) {
+                errorMessage.textContent = `Apps Script Error: ${data.error}`;
+                console.error("Apps Script Error:", data.error);
+                return;
             }
+            if (data.message) {
+                productContainer.textContent = `Message from Script: ${data.message}`;
+                return;
+            }
+            if (data.length === 0) {
+                productContainer.textContent = 'No product data received (empty array).';
+                return;
+            }
+
+            // Display each item and all its variables
+            data.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.style.marginBottom = '15px';
+                div.style.border = '1px solid #ccc';
+                div.style.padding = '10px';
+
+                const itemTitle = document.createElement('h3');
+                itemTitle.textContent = `Item ${index + 1}:`;
+                div.appendChild(itemTitle);
+
+                const ul = document.createElement('ul');
+                ul.style.listStyleType = 'none';
+                ul.style.paddingLeft = '0';
+
+                Object.entries(item).forEach(([key, value]) => {
+                    const li = document.createElement('li');
+                    li.textContent = `Key: "${key}" | Value: "${value}" (Type: ${typeof value})`;
+                    ul.appendChild(li);
+                });
+                div.appendChild(ul);
+                productContainer.appendChild(div);
+            });
+            console.log("JSONP data fetched and displayed successfully:", data);
+        }
+
+        /**
+         * Fetches product data using JSONP.
+         */
+        function fetchProductsJSONP() {
+            productContainer.textContent = 'Loading data...';
+            errorMessage.textContent = '';
+
+            // Generate a unique callback name
+            const callbackName = 'jsonpCallback_' + Date.now();
+
+            // Create a script element
+            const script = document.createElement('script');
+            script.src = `${WEB_APP_URL}?callback=${callbackName}`; // Pass callback function name as URL parameter
+            script.onerror = () => {
+                errorMessage.textContent = 'Error loading JSONP script. Check network or Apps Script URL.';
+                console.error("JSONP script failed to load.");
+            };
+
+            // Assign the callback function globally so the script can call it
+            window[callbackName] = (data) => {
+                handleProductData(data); // Call our handler
+                delete window[callbackName]; // Clean up global function
+                document.body.removeChild(script); // Remove script element
+            };
+
+            // Append the script element to the body to trigger the request
+            document.body.appendChild(script);
         }
 
         // Add event listener to the refresh button
-        refreshButton.addEventListener('click', fetchProducts);
+        refreshButton.addEventListener('click', fetchProductsJSONP);
 
         // Fetch data when the page loads
-        document.addEventListener('DOMContentLoaded', fetchProducts);
+        document.addEventListener('DOMContentLoaded', fetchProductsJSONP);
     </script>
 </body>
 </html>
