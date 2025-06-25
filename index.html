@@ -1,0 +1,97 @@
+﻿
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Product Info</title>
+</head>
+<body>
+
+    <h1>Product Information from Google Sheet</h1>
+
+    <button id="refreshButton">Refresh Data</button>
+
+    <div id="product-container">
+        Loading data...
+    </div>
+
+    <div id="error-message" style="color: red;"></div>
+
+    <script>
+        // Your deployed Google Apps Script Web App URL
+        // This URL is specific to YOUR Google Apps Script deployment.
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxUw87v2tY03ZPz-DFQfY4vTIBT5AksvrCSyjhzKvkv4EBzlnh4xe1mjmb6tDEtQ8iuSA/exec';
+
+        const productContainer = document.getElementById('product-container');
+        const refreshButton = document.getElementById('refreshButton');
+        const errorMessage = document.getElementById('error-message');
+
+        /**
+         * Fetches product data from the Google Apps Script web app and displays it.
+         */
+        async function fetchProducts() {
+            productContainer.textContent = 'Loading data...'; // Simple loading message
+            errorMessage.textContent = ''; // Clear previous errors
+
+            try {
+                const response = await fetch(WEB_APP_URL);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("HTTP Response Not OK:", response.status, response.statusText, errorText);
+                    throw new Error(`HTTP Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(`Apps Script Error: ${data.error}`);
+                }
+                if (data.message) {
+                    productContainer.textContent = data.message;
+                    return;
+                }
+
+                if (data.length === 0) {
+                    productContainer.textContent = 'No products found.';
+                    return;
+                }
+
+                // Clear previous content
+                productContainer.innerHTML = '';
+
+                // Display each item simply
+                data.forEach(item => {
+                    const div = document.createElement('div');
+                    // Accessing data using the sanitized keys from Apps Script
+                    // 'ProductName' becomes 'productname' and 'Price' becomes 'price'
+                    const productName = item.productname || 'Unnamed Product';
+                    const productPrice = item.price !== undefined && item.price !== null ? parseFloat(item.price).toFixed(2) : 'N/A';
+                    const productId = item.id || 'N/A';
+
+                    div.innerHTML = `
+                        <p><strong>Product Name:</strong> ${productName}</p>
+                        <p><strong>Price:</strong> £${productPrice}</p>
+                        <p><strong>ID:</strong> ${productId}</p>
+                        <hr>
+                    `;
+                    productContainer.appendChild(div);
+                });
+
+                console.log("Data fetched and displayed successfully.");
+
+            } catch (error) {
+                console.error("Failed to fetch data:", error);
+                errorMessage.textContent = `Error: ${error.message}. Please check console for details.
+                                             If running locally, consider a CORS browser extension.`;
+            }
+        }
+
+        // Add event listener to the refresh button
+        refreshButton.addEventListener('click', fetchProducts);
+
+        // Fetch data when the page loads
+        document.addEventListener('DOMContentLoaded', fetchProducts);
+    </script>
+</body>
+</html>
